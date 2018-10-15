@@ -1,0 +1,7 @@
+%_signature     gpg
+%_gpg_name      Company Packager
+%packager       Company Packager <software@ho-made.fake>
+%vendor         Ho-made
+%_topdir        %(echo $HOME)/rpmbuild
+%_tmppath       %(echo $HOME)/rpmbuild/tmp
+%debug_package  %{nil}

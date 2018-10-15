@@ -1,0 +1,99 @@
+#!/bin/bash
+#===============================================================================
+#
+#         FILE:  setup_packager
+#
+#        USAGE:  setup_packager
+#
+#  DESCRIPTION:  Bash script
+#
+#      OPTIONS:  ---
+# REQUIREMENTS:  ---
+#         BUGS:  ---
+#        NOTES:  ---
+#       AUTHOR:  John van Zantvoort (jvzantvoort), John@vanZantvoort.org
+#      COMPANY:  none
+#      CREATED:  15-Oct-2018
+#===============================================================================
+
+declare -r CONST_SCRIPTPATH="$(readlink -f $0)"
+declare -r CONST_SCRIPTNAME="$(basename $CONST_SCRIPTPATH .sh)"
+declare -r CONST_SCRIPTDIR="$(dirname $CONST_SCRIPTPATH)"
+declare -r CONST_FACILITY="local0"
+declare -xr LANG="C"
+
+function logging()
+{
+  local priority="$1"; shift
+  logger -p ${CONST_FACILITY}.${priority} -i -s -t "${CONST_SCRIPTNAME}" -- "${priority} $@"
+}
+
+function logging_err()
+{
+  logging "err" "$@"
+}
+
+function logging_info()
+{
+  logging "info" "$@"
+}
+
+function script_exit()
+{
+  local STRING="$1"
+  local RETV="${2:-0}"
+  if [ "$RETV" = "0" ]
+  then
+    logging_info "$STRING"
+  else
+    logging_err "$STRING"
+  fi
+  exit $RETV
+}
+
+function pathmunge()
+{
+  [ -d "$1" ] || return
+
+  EGREP="$(which --skip-alias egrep)"
+  [[ -z "${EGREP}" ]] && script_exit "ERROR: egrep not found" 1
+
+  if echo $PATH | $EGREP -q "(^|:)$1($|:)"
+  then
+    return
+  fi
+
+  if [ "$2" = "after" ]
+  then
+      PATH=$PATH:$1
+  else
+      PATH=$1:$PATH
+  fi
+}
+
+#------------------------------------------------------------------------------#
+#                                    Main                                      #
+#------------------------------------------------------------------------------#
+
+logging_info "start"
+
+# setup path
+#---------------------------------------
+pathmunge "${HOME}/bin" "after"
+export PATH
+
+sudo yum install rng-tools
+sudo systemctl start rngd.service
+
+cp "${CONST_SCRIPTDIR}/rpmmacros" "${HOME}/.rpmmacros"
+gpg --gen-key --batch "${CONST_SCRIPTDIR}/packager.key.batch"
+gpg --import packager.pub
+gpg --import packager.sec
+gpg --export -a 'Company Packager' >$HOME/RPM-GPG-KEY-packager
+sudo rpm --import $HOME/RPM-GPG-KEY-packager
+
+
+script_exit "end"
+#------------------------------------------------------------------------------#
+#                                  The End                                     #
+#------------------------------------------------------------------------------#
